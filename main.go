@@ -309,7 +309,19 @@ func main() {
 					if err != nil {
 						log.Fatalln(err)
 					}
-					if curTime.After(refTime) {
+					dirpath := filepath.Join("data", datapackage.Organization.Name, datapackage.Id)
+					filepath := filepath.Join("data", datapackage.Organization.Name, datapackage.Id, resource.Id+".csv")
+					// check if the resource file was modified after refTime
+					isFileOlderThanLastUpdate := false
+					fileInfo, err := os.Stat(filepath)
+					if err != nil {
+						// if the file doesnt exist then we say that its older
+						isFileOlderThanLastUpdate = true
+					} else if fileInfo.ModTime().Before(refTime) {
+						isFileOlderThanLastUpdate = true
+					}
+
+					if curTime.After(refTime) && isFileOlderThanLastUpdate {
 						time.Sleep(2 * time.Second) // rate limit so telegram doesnt get mad
 						fmt.Println(resource.Url)
 						// fetch updated
@@ -329,9 +341,7 @@ func main() {
 						resp.Body.Close()
 
 						// check if file already exists
-						dirpath := filepath.Join("data", datapackage.Organization.Name, datapackage.Id)
-						filepath := filepath.Join("data", datapackage.Organization.Name, datapackage.Id, resource.Id+".csv")
-						if _, err := os.Stat(filepath); err == nil {
+						if _, err := os.Stat(filepath); err == nil { // TODO: Redundant double check of file stat
 							// file exists
 							fmt.Println("File exists, diffing and overwriting")
 							oldfile, err := os.ReadFile(filepath)
