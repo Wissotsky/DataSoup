@@ -298,7 +298,10 @@ func main() {
 		resp.Body.Close()
 
 		var newDatafile File
-		json.Unmarshal(newDatafileBody, &newDatafile)
+		jsonErr := json.Unmarshal(newDatafileBody, &newDatafile)
+		if jsonErr != nil {
+			log.Fatalln(jsonErr)
+		}
 
 		client := &http.Client{Transport: &http.Transport{MaxConnsPerHost: 50}}
 
