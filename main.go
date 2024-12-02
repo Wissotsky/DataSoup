@@ -298,9 +298,9 @@ func main() {
 		resp.Body.Close()
 
 		var newDatafile File
-		jsonErr := json.Unmarshal(newDatafileBody, &newDatafile)
-		if jsonErr != nil {
-			log.Fatalln(jsonErr)
+		json.Unmarshal(newDatafileBody, &newDatafile)
+		if newDatafile.Success == false {
+			log.Fatalln("Failed to fetch new datafile")
 		}
 
 		client := &http.Client{Transport: &http.Transport{MaxConnsPerHost: 50}}
