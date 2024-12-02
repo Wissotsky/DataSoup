@@ -15,6 +15,10 @@ import (
 	"sync"
 	"time"
 	"unicode/utf16"
+
+	"golang.org/x/text/encoding/charmap"
+
+	"github.com/saintfish/chardet"
 )
 
 type File struct {
@@ -304,6 +308,7 @@ func main() {
 		}
 
 		client := &http.Client{Transport: &http.Transport{MaxConnsPerHost: 50}}
+		charDetector := chardet.NewTextDetector()
 
 		for _, datapackage := range newDatafile.Result.Results {
 			for _, resource := range datapackage.Resources {
@@ -337,11 +342,26 @@ func main() {
 						if err != nil {
 							log.Fatalln(err)
 						}
-						newfilebody, err := io.ReadAll(resp.Body) // TODO: Sometimes the diff ends up with borked unicode, need to debug that
+						newfilebody, err := io.ReadAll(resp.Body)
 						if err != nil {
 							log.Fatalln(err)
 						}
 						resp.Body.Close()
+
+						// detect encoding
+						result, err := charDetector.DetectBest(newfilebody)
+						if err != nil {
+							log.Fatalln(err)
+						}
+						fmt.Println(result.Charset)
+						// if charset is ISO-8859-8 or ISO-8859-8-I then convert from windows1255 to utf8
+						if result.Charset == "ISO-8859-8" || result.Charset == "ISO-8859-8-I" {
+							decoder := charmap.Windows1255.NewDecoder()
+							newfilebody, err = decoder.Bytes(newfilebody)
+							if err != nil {
+								log.Fatalln(err)
+							}
+						}
 
 						// check if file already exists
 						if _, err := os.Stat(filepath); err == nil { // TODO: Redundant double check of file stat
