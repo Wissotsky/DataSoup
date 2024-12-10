@@ -192,6 +192,15 @@ func findSubSliceOfMaxLen(slice []string, maxlen int, prefixLen int) ([]string, 
 	return subSlice, remainingCount
 }
 
+func isResourceExempt(resourceId string) bool {
+	switch resourceId {
+	case
+		"aba233c2-6a5a-487d-b0a8-9413ef849f15":
+		return true
+	}
+	return false
+}
+
 func main() {
 	bootstrapPtr := flag.Bool("bootstrap", false, "Bootstrap the data files")
 	flag.Parse()
@@ -312,7 +321,7 @@ func main() {
 
 		for _, datapackage := range newDatafile.Result.Results {
 			for _, resource := range datapackage.Resources {
-				if resource.Format == "CSV" {
+				if resource.Format == "CSV" && !isResourceExempt(resource.Id) {
 					curTime, err := time.Parse("2006-01-02T15:04:05.000000", resource.MetadataModified)
 					if err != nil {
 						log.Fatalln(err)
@@ -355,7 +364,7 @@ func main() {
 						}
 						fmt.Println(result.Charset)
 						// if charset is ISO-8859-8 or ISO-8859-8-I then convert from windows1255 to utf8
-						if result.Charset == "ISO-8859-8" || result.Charset == "ISO-8859-8-I" {
+						if result.Charset != "UTF-8" {
 							decoder := charmap.Windows1255.NewDecoder()
 							newfilebody, err = decoder.Bytes(newfilebody)
 							if err != nil {
