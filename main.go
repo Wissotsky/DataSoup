@@ -213,15 +213,71 @@ func processDiffToPayload(isNewResource bool, diff []string, datapackage FileRes
 		prefix = "📘 Update: "
 	}
 
-	datasetName := resource.Name
+	// if its the flight data we will process it differently //TODO: make a more robust system for processing exceptional data
+	isFlightData := false
+	isRegularDiff := true
+	if resource.Id == "e83f763b-b7d7-479e-b172-ae981ddc6de5" {
+		isRegularDiff = false
+		isFlightData = true
+		prefix = "✈ Flights Update: "
+	}
 
-	diffSlice, remainingCount := findSubSliceOfMaxLen(diff, 3800, len(utf16.Encode([]rune(datasetName))))
-	datasetDiffJoined := strings.Join(diffSlice, "\n")
+	datasetName := resource.Name
 	var datasetDiff string
-	if remainingCount == 0 {
-		datasetDiff = datasetDiffJoined
-	} else {
-		datasetDiff = fmt.Sprintf("%s\n... and %d more", datasetDiffJoined, remainingCount)
+
+	if isRegularDiff {
+		diffSlice, remainingCount := findSubSliceOfMaxLen(diff, 3800, len(utf16.Encode([]rune(datasetName))))
+		datasetDiffJoined := strings.Join(diffSlice, "\n")
+
+		if remainingCount == 0 {
+			datasetDiff = datasetDiffJoined
+		} else {
+			datasetDiff = fmt.Sprintf("%s\n... and %d more", datasetDiffJoined, remainingCount)
+		}
+	}
+
+	if isFlightData {
+		departed := make(map[string]int)
+		landed := make(map[string]int)
+		cancelled := make(map[string]int)
+
+		for _, flightEntry := range diff {
+			splitFlightEntry := strings.Split(flightEntry, ",")
+
+			countryName := splitFlightEntry[11]
+			statusString := splitFlightEntry[15]
+
+			switch statusString {
+			case "LANDED":
+				landed[countryName] += 1
+			case "DEPARTED":
+				departed[countryName] += 1
+			case "CANCELED":
+				cancelled[countryName] += 1
+			}
+		}
+
+		var stringArrayToBuildMessage []string
+
+		stringArrayToBuildMessage = append(stringArrayToBuildMessage, "🛫 Departures To:")
+
+		for key, value := range departed {
+			stringArrayToBuildMessage = append(stringArrayToBuildMessage, fmt.Sprintf("%s: %d", key, value))
+		}
+
+		stringArrayToBuildMessage = append(stringArrayToBuildMessage, "🛬 Arrived From:")
+
+		for key, value := range landed {
+			stringArrayToBuildMessage = append(stringArrayToBuildMessage, fmt.Sprintf("%s: %d", key, value))
+		}
+
+		stringArrayToBuildMessage = append(stringArrayToBuildMessage, "❌ Cancelled Flights:")
+
+		for key, value := range cancelled {
+			stringArrayToBuildMessage = append(stringArrayToBuildMessage, fmt.Sprintf("%s: %d", key, value))
+		}
+
+		datasetDiff = strings.Join(stringArrayToBuildMessage, "\n")
 	}
 
 	prefixLen := len(utf16.Encode([]rune(prefix)))
