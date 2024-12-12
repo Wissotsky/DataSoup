@@ -195,10 +195,73 @@ func findSubSliceOfMaxLen(slice []string, maxlen int, prefixLen int) ([]string, 
 func isResourceExempt(resourceId string) bool {
 	switch resourceId {
 	case
+		"053cea08-09bc-40ec-8f7a-156f0677aff3",
 		"aba233c2-6a5a-487d-b0a8-9413ef849f15":
 		return true
 	}
 	return false
+}
+
+func processDiffToPayload(isNewResource bool, diff []string, datapackage FileResultItem, resource Resource) SendMessagePayload {
+	// TODO: if diff length is equal to zero it means there is no difference between the files, therefore dont send a message
+	var prefix string
+	if isNewResource {
+		fmt.Println("TODO Notification: Added New Resource ", resource.Name)
+		prefix = "📗 New Resource: "
+	} else {
+		fmt.Println("TODO Notification: Updated Resource ", resource.Name)
+		prefix = "📘 Update: "
+	}
+
+	datasetName := resource.Name
+
+	diffSlice, remainingCount := findSubSliceOfMaxLen(diff, 3800, len(utf16.Encode([]rune(datasetName))))
+	datasetDiffJoined := strings.Join(diffSlice, "\n")
+	var datasetDiff string
+	if remainingCount == 0 {
+		datasetDiff = datasetDiffJoined
+	} else {
+		datasetDiff = fmt.Sprintf("%s\n... and %d more", datasetDiffJoined, remainingCount)
+	}
+
+	prefixLen := len(utf16.Encode([]rune(prefix)))
+	datasetNameLen := len(utf16.Encode([]rune(datasetName)))
+	datasetDiffLen := len(utf16.Encode([]rune(datasetDiff)))
+
+	var tagNames []string
+	//var tagOffsets []int
+	//var tagLengths []int
+
+	// parse datapackage tags
+	for _, tag := range datapackage.Tags {
+		tagName := strings.ReplaceAll(tag.DisplayName, " ", "_")
+		tagNames = append(tagNames, fmt.Sprintf("#%s", tagName))
+	}
+
+	tagString := strings.Join(tagNames, " ")
+
+	blockquoteMsgEntity := MessageEntity{
+		Type:   "expandable_blockquote",
+		Offset: prefixLen + datasetNameLen + 2,
+		Length: datasetDiffLen,
+	}
+
+	urllinkMsgEntity := MessageEntity{
+		Type:   "text_link",
+		Url:    fmt.Sprintf("https://data.gov.il/dataset/%s/resource/%s", datapackage.Id, resource.Id),
+		Offset: prefixLen + 1,
+		Length: datasetNameLen,
+	}
+	// send message
+	payload := SendMessagePayload{
+		ChatId: "@datasoup",
+		Text:   strings.Join([]string{prefix, datasetName, datasetDiff, tagString}, "\n"),
+		Entities: []MessageEntity{
+			blockquoteMsgEntity,
+			urllinkMsgEntity,
+		},
+	}
+	return payload
 }
 
 func main() {
@@ -321,7 +384,7 @@ func main() {
 
 		for _, datapackage := range newDatafile.Result.Results {
 			for _, resource := range datapackage.Resources {
-				if resource.Format == "CSV" && !isResourceExempt(resource.Id) {
+				if resource.Format == "CSV" && !isResourceExempt(resource.Id) && resource.Size < 200_000_000 { // is it csv, not excempt and less than 200 megabytes
 					curTime, err := time.Parse("2006-01-02T15:04:05.000000", resource.MetadataModified)
 					if err != nil {
 						log.Fatalln(err)
@@ -395,46 +458,9 @@ func main() {
 									diff = append(diff, line)
 								}
 							}
-							// TODO: Send diff to telegram
-							fmt.Println("TODO Notification: Updated Resource ", resource.Name)
-							//fmt.Println(diff)
-							prefix := "📘 Update: "
-							datasetName := resource.Name
 
-							diffSlice, remainingCount := findSubSliceOfMaxLen(diff, 3800, len(utf16.Encode([]rune(datasetName))))
-							datasetDiffJoined := strings.Join(diffSlice, "\n")
-							var datasetDiff string
-							if remainingCount == 0 {
-								datasetDiff = datasetDiffJoined
-							} else {
-								datasetDiff = fmt.Sprintf("%s\n... and %d more", datasetDiffJoined, remainingCount)
-							}
+							payload := processDiffToPayload(false, diff, datapackage, resource)
 
-							prefixLen := len(utf16.Encode([]rune(prefix)))
-							datasetNameLen := len(utf16.Encode([]rune(datasetName)))
-							datasetDiffLen := len(utf16.Encode([]rune(datasetDiff)))
-
-							blockquoteMsgEntity := MessageEntity{
-								Type:   "expandable_blockquote",
-								Offset: prefixLen + datasetNameLen + 2,
-								Length: datasetDiffLen,
-							}
-
-							urllinkMsgEntity := MessageEntity{
-								Type:   "text_link",
-								Url:    fmt.Sprintf("https://data.gov.il/dataset/%s/resource/%s", datapackage.Id, resource.Id),
-								Offset: prefixLen + 1,
-								Length: datasetNameLen,
-							}
-							// send message
-							payload := SendMessagePayload{
-								ChatId: "@datasoup",
-								Text:   strings.Join([]string{prefix, datasetName, datasetDiff}, "\n"),
-								Entities: []MessageEntity{
-									blockquoteMsgEntity,
-									urllinkMsgEntity,
-								},
-							}
 							payloadJson, err := json.Marshal(payload)
 							if err != nil {
 								log.Fatalln(err)
@@ -482,45 +508,11 @@ func main() {
 								log.Fatalln(err)
 							}
 							file.Close()
-							fmt.Println("TODO Notification: Added New Resource ", resource.Name)
-							prefix := "📗 New Resource: "
-							datasetName := resource.Name
+
 							diff := strings.Split(string(newfilebody), "\n")
 
-							diffSlice, remainingCount := findSubSliceOfMaxLen(diff, 3800, len(utf16.Encode([]rune(datasetName))))
-							datasetDiffJoined := strings.Join(diffSlice, "\n")
-							var datasetDiff string
-							if remainingCount == 0 {
-								datasetDiff = datasetDiffJoined
-							} else {
-								datasetDiff = fmt.Sprintf("%s\n... and %d more", datasetDiffJoined, remainingCount)
-							}
+							payload := processDiffToPayload(true, diff, datapackage, resource)
 
-							prefixLen := len(utf16.Encode([]rune(prefix)))
-							datasetNameLen := len(utf16.Encode([]rune(datasetName)))
-							datasetDiffLen := len(utf16.Encode([]rune(datasetDiff)))
-
-							blockquoteMsgEntity := MessageEntity{
-								Type:   "expandable_blockquote",
-								Offset: prefixLen + datasetNameLen + 2,
-								Length: datasetDiffLen,
-							}
-
-							urllinkMsgEntity := MessageEntity{
-								Type:   "text_link",
-								Url:    fmt.Sprintf("https://data.gov.il/dataset/%s/resource/%s", datapackage.Id, resource.Id),
-								Offset: prefixLen + 1,
-								Length: datasetNameLen,
-							}
-							// send message
-							payload := SendMessagePayload{
-								ChatId: "@datasoup",
-								Text:   strings.Join([]string{prefix, datasetName, datasetDiff}, "\n"),
-								Entities: []MessageEntity{
-									blockquoteMsgEntity,
-									urllinkMsgEntity,
-								},
-							}
 							payloadJson, err := json.Marshal(payload)
 							if err != nil {
 								log.Fatalln(err)
