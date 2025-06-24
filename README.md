@@ -28,4 +28,4 @@ Every time you run the project it will go through[1] any changes made since last
 
 **Resources** consist of the actual data files. E.g. CSV files, XLSX files, etc. (We only care about CSV files for now)
 
-**Tags** group Datasets by a common theme. E.g. Covid-19, Education, etc. (Not implemented yet)
+**Tags** group Datasets by a common theme. E.g. Covid-19, Education, etc.
