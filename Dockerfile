@@ -2,14 +2,18 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
+# Install git and other dependencies
+RUN apk add --no-cache git
+
+# Copy source code first
+COPY . .
+
+# Initialize go module if it doesn't exist
+RUN if [ ! -f go.mod ]; then go mod init datasoup; fi
 
 # Download dependencies
+RUN go mod tidy
 RUN go mod download
-
-# Copy source code
-COPY . .
 
 # Build both applications
 RUN go build -o main main.go
@@ -17,7 +21,7 @@ RUN go build -o monitoring_server monitoring_server.go
 
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS requests
+# Install ca-certificates
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
