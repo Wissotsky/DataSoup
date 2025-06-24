@@ -1,0 +1,6 @@
+.git
+.gitignore
+README.md
+data/
+.telegram_token
+*.log

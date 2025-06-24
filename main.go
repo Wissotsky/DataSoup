@@ -384,12 +384,17 @@ func main() {
 	} else {
 		fmt.Println("Running normally")
 		// telegram bot
-		// load token from dotfile
-		token, err := os.ReadFile(".telegram_token")
-		if err != nil {
-			log.Fatalln(err)
+		// load token from environment variable
+		token := os.Getenv("TELEGRAM_TOKEN")
+		if token == "" {
+			// fallback to reading from file for backward compatibility
+			tokenBytes, err := os.ReadFile(".telegram_token")
+			if err != nil {
+				log.Fatalln("TELEGRAM_TOKEN environment variable not set and .telegram_token file not found")
+			}
+			token = string(tokenBytes)
 		}
-		endpointUrl := fmt.Sprint("https://api.telegram.org/bot", string(token))
+		endpointUrl := fmt.Sprint("https://api.telegram.org/bot", token)
 
 		// check that it works
 		respBotCheck, err := http.Get(fmt.Sprint(endpointUrl, "/getMe"))
